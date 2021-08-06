@@ -1,12 +1,14 @@
-struct Piece {
+use rusttype::Point;
+pub struct Piece {
     shape: Vec<Vec<bool>>,
     used: bool,
     id: i32,
 }
 
-impl Piece {
-    fn rotate(&self) -> Piece {}
-    fn miller(&self) -> Piece {}
-    fn move(&self,p: &Point) -> Piece {}
-
+pub impl Piece {
+    pub fn From(s: &str) -> Piece {}
+    pub fn rotate(&self) -> Piece {}
+    pub fn all_rotate(&self) -> Vec<Piece> {}
+    pub fn miller(&self) -> Piece {}
+    pub fn translation(&self, p: &Point) -> Piece {}
 }

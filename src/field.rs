@@ -1,32 +1,45 @@
 use piece::Piece;
 use std::fmt;
 
-struct Field {
+pub struct Field {
     field: Vec<Vec<i32>>,
-    pieces: Vec<piece>,
+    pieces: Vec<Piece>,
 }
 
 pub impl Field {
-    fn find_empty(&self) -> Point(i32, i32) {
+    pub fn make_field(field: &str, pieces: [&str]) {
+        let mut field = Field::new(field);
+
+        for piece in pieces {
+            let rotate_pieces = Piece::From(piece).all_rotate();
+            field.append_pieces(rotate_pieces);
+        }
+        field
+    }
+    pub fn append_pieces(&mut self, pieces: Piece) {
+        self.pieces.append(pieces);
+    }
+
+    pub fn find_empty(&self) -> Point(i32, i32) {
         // field.field内部のemptyを探す
         // 返り値は座標
         let field = &self.field;
     }
-    fn can_place_piece(&self, piece: &Piece, p: &Point) -> bool {}
+    pub fn can_place_piece(&self, piece: &Piece, p: &Point) -> bool {}
 
-    fn piece_can_add(&mut self, piece: &Piece, p: &Point) -> bool {
+    pub fn piece_can_add(&mut self, piece: &Piece, p: &Point) -> bool {
         // 指定された座標にpieceが入るのかどうか
     }
-    fn place_piece(&mut self, piece: &Piece, p: &Point) {}
+    pub fn place_piece(&mut self, piece: &Piece, p: &Point) {}
 
-    fn get_piece(&mut self) -> Piece {
+    pub fn get_piece(&mut self) -> Piece {
         let piece = self.piece.shape.pop().unwrap();
         piece
     }
 }
 
 pub impl fmt::Display for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         //
         let s::String = String::new();
         for line in self.field {
