@@ -1,24 +1,31 @@
 use rusttype::Point;
 
-pub struct Shape(Vec<Vec<bool>>);
+// base on left upper block.
+// ex) 001\n111\n => [Point(0,0), Point(-2,1), Point(-1,1), Point(0,1)]
 
-pub struct Piece {
-    // Piece includes Shapes which can be regarded as the same.
-    shapes: Vec<Shape>, // include Rotational symmetry or Line symmetry of shape.
-    index: usize, // index of shapes. if index equal to len(shapes), this piece is not still used.
-    id: usize,
-    coordinate: Point<usize>, // upper left coordinate of piece.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Piece(pub Vec<Point<i32>>);
+
+#[derive(Clone, Debug)]
+pub struct PieceSet {
+    // PieceSet includes Pieces which can be regarded as the same.
+    pub pieces: Vec<Piece>, // include Rotational symmetry or Line symmetry of piece.
+    pub index: usize, // index of pieces. if index equal to len(pieces), this piece is not still used.
+    pub used: bool,
+    pub id: usize,
+    pub coordinate: Point<usize>, // upper left coordinate of piece.
 }
 
-impl Shape {
-    // To generate shape
+impl Piece {
+    // To generate piece
 
-    pub fn from_str(s: &str) -> Shape {
+    pub fn from_str(s: &str) -> Piece {
         // str must have same row length, have only 0,1,\n and each row and column must have 1.
         // for example 110\n011\n, not 01\n001 , 011\n122\n or 011\n011\n;
         // if not, compiler must be going to panic!
+
         let split_newline: Vec<&str> = s.split("\n").collect();
-        Shape::check_input_length(&split_newline);
+        Piece::check_input_length(&split_newline);
 
         let split_all = split_newline
             .iter()
@@ -30,97 +37,188 @@ impl Shape {
                     .collect::<Vec<bool>>()
             })
             .collect::<Vec<Vec<bool>>>();
-        Shape::check_input_row_0(&split_all);
-        Shape::check_input_column_0(&split_all);
+        Piece::check_input_shapes(&split_all);
 
-        Shape(split_all)
+        let mut base_x: i32 = -1;
+        let mut base_y: i32 = -1;
+
+        let mut points = vec![Point { x: 0, y: 0 }];
+        for (column_num, column) in split_all.iter().enumerate() {
+            for (row_num, flag) in column.iter().enumerate() {
+                if base_x < 0 && *flag {
+                    base_x = row_num as i32;
+                    base_y = column_num as i32;
+                } else if *flag {
+                    let x = row_num as i32 - base_x;
+                    let y = column_num as i32 - base_y;
+                    points.push(Point { x, y });
+                }
+            }
+        }
+
+        Piece(points)
     }
-    pub fn check_input_length(v: &Vec<&str>) {
+
+    fn check_input_length(v: &Vec<&str>) {
         let mut leng: Vec<usize> = v
             .iter()
             .map(|&x| x.to_string().len())
             .collect::<Vec<usize>>();
         leng.sort();
         if leng[0] != leng[leng.len() - 1] {
-            panic!("Value Error: Shape must be rectangle. So you should input str having the same length of row : {:?}",v);
-        }
-    }
-    pub fn check_input_row_0(v: &Vec<Vec<bool>>) {
-        // not immplemented
-        if true {
-            panic!("ValueError: Shape must be optimize. So you should input str each of row must have 1.")
-        }
-    }
-    pub fn check_input_column_0(v: &Vec<Vec<bool>>) {
-        // not immplemented
-        if true {
-            panic!("ValueError: Shape must be optimize. So you should input str each of column must have 1.")
+            panic!("Value Error: Piece must be rectangle. So you should input str having the same length of row : {:?}",v);
         }
     }
 
-    // To generate Piece
+    fn check_input_shapes(v: &Vec<Vec<bool>>) {
+        let mut v = v.clone();
+        let mut stack: Vec<Point<usize>> = Vec::new();
+        for x in 0..v[0].len() {
+            for y in 0..v.len() {
+                if v[y][x] {
+                    stack.push(Point { x, y });
+                    break;
+                }
+            }
+        }
+        let direction = vec![
+            Point { x: 0, y: 1 },
+            Point { x: 0, y: -1 },
+            Point { x: 1, y: 0 },
+            Point { x: -1, y: 0 },
+        ];
+        while !stack.is_empty() {
+            let p = stack.pop().unwrap();
+            v[p.y][p.x] = false;
+
+            for q in &direction {
+                let nowx = p.x as i32 + q.x;
+                let nowy = p.y as i32 + q.y;
+                if !nowx.is_negative()
+                    && !nowy.is_negative()
+                    && (nowx as usize) < v[0].len()
+                    && (nowy as usize) < v.len()
+                    && v[nowy as usize][nowx as usize]
+                {
+                    stack.push(Point {
+                        x: nowx as usize,
+                        y: nowy as usize,
+                    })
+                }
+            }
+        }
+        for i in &v {
+            if i.contains(&true) {
+                panic!(
+                    "ValueError: there are two or more objects in the same piece. {:?}",
+                    v
+                )
+            }
+        }
+    }
+
+    // To generate PieceSet
     // ownership is going to move.
-    fn rotate(&self) -> Shape {
-        // not implemented
-        let tmp: Vec<Vec<bool>> = Vec::new();
-        Shape(tmp)
-    }
-    fn miller<'a>(&self) -> Shape {
-        let mut miller_shape: Vec<Vec<bool>> = Vec::new();
-        for column in &self.0 {
-            let mut miller = column.clone();
-            miller.reverse();
-            miller_shape.push(miller);
+    pub fn points_normalize(self) -> Piece {
+        let mut points = self.0;
+        points.sort_by(|a, b| {
+            // first cmp y, second cmp x.
+            if a.y == b.y {
+                a.x.cmp(&b.x)
+            } else {
+                a.y.cmp(&b.y)
+            }
+        });
+
+        let base = Point {
+            x: points[0].x,
+            y: points[0].y,
+        };
+        for p in &mut points {
+            p.x = &p.x - base.x;
+            p.y = &p.y - base.y;
         }
-        Shape(miller_shape)
+        Piece(points)
     }
 
-    pub fn all_rotate(self, id: usize) -> Piece {
-        let mut shapes: Vec<Shape> = Vec::new();
+    pub fn rotate(&self) -> Piece {
+        let mut rotate_piece: Vec<Point<i32>> = Vec::new();
+        for p in &self.0 {
+            rotate_piece.push(Point { x: -p.y, y: p.x });
+        }
+        Piece(rotate_piece).points_normalize()
+    }
+
+    fn miller(&self) -> Piece {
+        let mut miller_piece: Vec<Point<i32>> = Vec::new();
+        for p in &self.0 {
+            miller_piece.push(Point { x: -p.x, y: p.y });
+        }
+        Piece(miller_piece).points_normalize()
+    }
+    fn remove_symmetry(pieces: Vec<Piece>) -> Vec<Piece> {
+        let mut removed_pieces: Vec<Piece> = Vec::new();
+        for piece in pieces {
+            if !removed_pieces.contains(&piece) {
+                removed_pieces.push(piece);
+            }
+        }
+        removed_pieces
+    }
+
+    pub fn all_rotate(self, id: usize) -> PieceSet {
+        let mut pieces: Vec<Piece> = Vec::new();
         let mut rotate = self.rotate();
         let mut tmp;
         for _ in 0..3 {
             tmp = rotate.rotate();
-            shapes.push(rotate);
+            pieces.push(rotate);
             rotate = tmp;
         }
-        shapes.push(rotate);
-        Piece::new(shapes, id)
+        pieces.push(rotate);
+        let pieces = Piece::remove_symmetry(pieces);
+        PieceSet::new(pieces, id)
     }
-    pub fn all_miller(self, id: usize) -> Piece {
-        let mut shapes: Vec<Shape> = Vec::new();
-        shapes.push(self.miller());
-        shapes.push(self);
+    pub fn all_miller(self, id: usize) -> PieceSet {
+        let mut pieces: Vec<Piece> = Vec::new();
+        pieces.push(self.miller());
+        pieces.push(self);
 
-        Piece::new(shapes, id)
+        let pieces = Piece::remove_symmetry(pieces);
+        PieceSet::new(pieces, id)
     }
-    pub fn all_rotate_and_miller(self, id: usize) -> Piece {
+    pub fn all_rotate_and_miller(self, id: usize) -> PieceSet {
         let miller = self.all_miller(id);
-        let mut shapes: Vec<Shape> = Vec::new();
-        for sps in miller.shapes {
+        let mut pieces: Vec<Piece> = Vec::new();
+        for sps in miller.pieces {
             let mut rotate = sps.all_rotate(id);
-            shapes.append(&mut rotate.shapes);
+            pieces.append(&mut rotate.pieces);
         }
-        Piece::new(shapes, id)
+
+        let pieces = Piece::remove_symmetry(pieces);
+        PieceSet::new(pieces, id)
     }
 }
 
-impl Piece {
-    pub fn new(shapes: Vec<Shape>, id: usize) -> Piece {
-        let index = shapes.len();
+impl PieceSet {
+    pub fn new(pieces: Vec<Piece>, id: usize) -> PieceSet {
+        let index = pieces.len();
         let coordinate = Point { x: 0, y: 0 };
-        Piece {
-            shapes,
+        let used = false;
+        PieceSet {
+            pieces,
             index,
+            used,
             id,
             coordinate,
         }
     }
-    // Piece -> Piece
-    pub fn translation(self, p: Point<usize>) -> Piece {
-        Piece {
-            shapes: self.shapes,
+    // PieceSet -> PieceSet
+    pub fn translation(self, p: Point<usize>) -> PieceSet {
+        PieceSet {
+            pieces: self.pieces,
             index: self.index,
+            used: false,
             id: self.id,
             coordinate: Point {
                 x: p.x + self.coordinate.x,
@@ -129,10 +227,10 @@ impl Piece {
         }
     }
 
-    pub fn add_piece(mut self, other: &mut Piece) -> Piece {
+    pub fn add_piece(mut self, other: &mut PieceSet) -> PieceSet {
         // index is initialized.
-        self.shapes.append(&mut other.shapes);
-        self.index = self.shapes.len();
+        self.pieces.append(&mut other.pieces);
+        self.index = self.pieces.len();
         self
     }
 }
